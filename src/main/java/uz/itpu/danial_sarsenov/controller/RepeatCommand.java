@@ -2,11 +2,12 @@ package uz.itpu.danial_sarsenov.controller;
 
 import uz.itpu.danial_sarsenov.controller.history.CommandHistory;
 
-public class    RepeatCommand implements Command {
+public class RepeatCommand implements Command {
 
     @Override
     public Response execute(String[] args) {
-        if (args.length != 2) {
+
+        if (args.length < 2) {
             return new ResponseImpl("Usage: repeat <number>", false, false);
         }
 
@@ -18,6 +19,7 @@ public class    RepeatCommand implements Command {
         }
 
         String command = CommandHistory.get(index);
+
         if (command == null) {
             return new ResponseImpl("No command with such index", false, false);
         }

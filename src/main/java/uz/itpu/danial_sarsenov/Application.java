@@ -1,11 +1,15 @@
 package uz.itpu.danial_sarsenov;
 
+import uz.itpu.danial_sarsenov.auth.AuthService;
 import uz.itpu.danial_sarsenov.config.Config;
 import uz.itpu.danial_sarsenov.config.PropertiesConfigImpl;
+import uz.itpu.danial_sarsenov.server.AuthContext;
 import uz.itpu.danial_sarsenov.server.Server;
 import uz.itpu.danial_sarsenov.view.*;
 
+
 public class Application {
+    int port = Integer.parseInt(System.getProperty("app.port", "12345"));
     public static void main(String[] args) {
         String props = "app";
         String batchFile = null;
@@ -18,11 +22,15 @@ public class Application {
         }
 
         try {
-            // --- Инициализация конфигурации ---
+
             Config config = new PropertiesConfigImpl(props);
             config.init();
 
-            // --- Старт сервера мультиклиента ---
+
+            AuthContext.init(new AuthService());
+
+
+
             int port = 12345; // можно вынести в props
             Server server = new Server(port);
             new Thread(server::start).start();
@@ -36,11 +44,6 @@ public class Application {
             }
 
             ViewFactory.init(view);
-
-            // --- Запуск авторизации клиента ---
-            // каждый клиент получает роль user/admin
-            String role = view.login(); // метод login() возвращает "user" или "admin"
-            view.setRole(role);         // на основе роли ограничиваем доступ к командам
 
             // --- Старт view ---
             view.start();

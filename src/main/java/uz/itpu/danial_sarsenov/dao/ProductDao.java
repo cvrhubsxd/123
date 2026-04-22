@@ -20,10 +20,12 @@ public class ProductDao extends FileBasedDao<Product> {
 
     @Override
     protected Product parse(String line) {
-        String[] parts = line.split(","); // запятая
+        String[] parts = line.split(",");
+
         if (parts.length != 6) {
             throw new DaoException("Invalid product line: " + line, null);
         }
+
         try {
             int id = Integer.parseInt(parts[0].trim());
             String name = parts[1].trim();
@@ -31,10 +33,21 @@ public class ProductDao extends FileBasedDao<Product> {
             double price = Double.parseDouble(parts[3].trim());
             int quantity = Integer.parseInt(parts[4].trim());
             int supplierId = Integer.parseInt(parts[5].trim());
+
             Supplier supplier = supplierCache.get(supplierId);
-            if (supplier == null) throw new DaoException("Supplier not found: " + supplierId, null);
-            // Используем имя поставщика вместо других деталей
-            return new Product(id, name, category, price, quantity, supplier.getName(), "", 0, 0);
+            if (supplier == null) {
+                throw new DaoException("Supplier not found: " + supplierId, null);
+            }
+
+            return new Product(
+                    id,
+                    name,
+                    category,
+                    price,
+                    quantity,
+                    supplier.getName()
+            );
+
         } catch (Exception e) {
             throw new DaoException("Failed to parse product line: " + line, e);
         }

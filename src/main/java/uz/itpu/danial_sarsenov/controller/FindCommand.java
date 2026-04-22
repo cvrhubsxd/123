@@ -3,24 +3,20 @@ package uz.itpu.danial_sarsenov.controller;
 import uz.itpu.danial_sarsenov.entity.Product;
 import uz.itpu.danial_sarsenov.entity.search.ProductSearchCriteria;
 import uz.itpu.danial_sarsenov.exception.ServiceException;
+import uz.itpu.danial_sarsenov.service.ProductSearchService;
 import uz.itpu.danial_sarsenov.service.ServiceFactory;
-import uz.itpu.danial_sarsenov.service.search.ProductSearchRanker;
 
 import java.util.*;
 
 public class FindCommand implements Command {
 
-    private static final Set<String> SYSTEM_FILTERS =
-            Set.of("all", "kitchen", "electric", "cooling");
+    private final ProductSearchService searchService = new ProductSearchService();
 
     @Override
     public Response execute(String[] args) {
+
         if (args == null || args.length < 2) {
-            return new ResponseImpl(
-                    "Usage: find <all|kitchen|electric|cooling> [name=xxx] [price=low;high]",
-                    false,
-                    false
-            );
+            return new ResponseImpl("Usage: find ...", false, false);
         }
 
         String filter = args[1].toLowerCase();
@@ -28,88 +24,50 @@ public class FindCommand implements Command {
 
         String name = params.get("name");
 
-        if (!SYSTEM_FILTERS.contains(filter)) {
-            name = filter;
-            filter = "all";
-        }
-
         Double priceLow = null;
         Double priceHigh = null;
 
         if (params.containsKey("price")) {
             String[] range = params.get("price").split(";");
-            try {
-                if (range.length == 2) {
-                    priceLow = Double.parseDouble(range[0]);
-                    priceHigh = Double.parseDouble(range[1]);
-                }
-            } catch (NumberFormatException e) {
-                return new ResponseImpl(
-                        "Invalid price range format. Use low;high",
-                        false,
-                        false
-                );
-            }
+            priceLow = Double.parseDouble(range[0]);
+            priceHigh = Double.parseDouble(range[1]);
         }
 
-        ProductSearchCriteria criteria;
-
-        switch (filter) {
-            case "all" ->
-                    criteria = new ProductSearchCriteria(name, null, priceLow, priceHigh, null);
-            case "kitchen" ->
-                    criteria = new ProductSearchCriteria(name, "Kitchen", priceLow, priceHigh, null);
-            case "electric" ->
-                    criteria = new ProductSearchCriteria(name, null, priceLow, priceHigh, "Electric");
-            case "cooling" ->
-                    criteria = new ProductSearchCriteria(name, null, priceLow, priceHigh, "Cooling");
-            default ->
-                    criteria = new ProductSearchCriteria(name, null, priceLow, priceHigh, null);
-        }
+        ProductSearchCriteria criteria = switch (filter) {
+            case "kitchen" -> new ProductSearchCriteria(name, "Kitchen", priceLow, priceHigh);
+            case "electric" -> new ProductSearchCriteria(name, "Electric", priceLow, priceHigh);
+            case "cooling" -> new ProductSearchCriteria(name, "Cooling", priceLow, priceHigh);
+            default -> new ProductSearchCriteria(name, null, priceLow, priceHigh);
+        };
 
         try {
-            List<Product> products = ServiceFactory
-                    .getProductService()
-                    .find(criteria);
-            final String searchName = name;
+            List<Product> products = ServiceFactory.getProductService().findAll();
 
-            if (searchName != null && !searchName.isBlank()) {
-                products = products.stream()
-                        .filter(p -> ProductSearchRanker.matches(p, searchName))
-                        .sorted(ProductSearchRanker.comparator(searchName))
-                        .toList();
+            List<Product> result = searchService.search(products, criteria, name);
+
+            if (result.isEmpty()) {
+                return new ResponseImpl("No products found", true, false);
             }
 
-
-            return products.isEmpty()
-                    ? new ResponseImpl("No appliances found", true, false)
-                    : new ResponseImpl(formatList(products), true, false);
+            return new ResponseImpl(format(result), true, false);
 
         } catch (ServiceException e) {
-            return new ResponseImpl(
-                    "Service error: " + e.getMessage(),
-                    false,
-                    true
-            );
+            return new ResponseImpl("Service error", false, false);
         }
     }
 
-    private Map<String, String> parseParams(String[] paramStrings) {
+    private Map<String, String> parseParams(String[] args) {
         Map<String, String> map = new HashMap<>();
-        for (String param : paramStrings) {
-            String[] kv = param.split("=", 2);
-            if (kv.length == 2) {
-                map.put(kv[0].toLowerCase(), kv[1]);
-            }
+        for (String a : args) {
+            String[] kv = a.split("=");
+            if (kv.length == 2) map.put(kv[0], kv[1]);
         }
         return map;
     }
 
-    private <T> String formatList(List<T> list) {
+    private String format(List<Product> list) {
         StringBuilder sb = new StringBuilder();
-        for (T item : list) {
-            sb.append(item).append(System.lineSeparator());
-        }
-        return sb.toString().trim();
+        for (Product p : list) sb.append(p).append("\n");
+        return sb.toString();
     }
 }
